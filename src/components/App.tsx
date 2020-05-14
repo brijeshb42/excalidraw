@@ -54,7 +54,7 @@ import {
 import Portal from "./Portal";
 
 import { renderScene } from "../renderer";
-import { AppState, GestureEvent, Gesture } from "../types";
+import { AppProps, AppState, GestureEvent, Gesture } from "../types";
 import { ExcalidrawElement, ExcalidrawTextElement } from "../element/types";
 
 import { distance2d, isPathALoop, getGridPoint } from "../math";
@@ -143,6 +143,7 @@ import {
   isElementInGroup,
   getSelectedGroupIdForElement,
 } from "../groups";
+import { addPostMessageSupport, PostMessageListener } from "../postMessage";
 
 /**
  * @param func handler taking at most single parameter (event).
@@ -175,7 +176,7 @@ const gesture: Gesture = {
   initialScale: null,
 };
 
-class App extends React.Component<any, AppState> {
+class App extends React.Component<AppProps, AppState> {
   canvas: HTMLCanvasElement | null = null;
   rc: RoughCanvas | null = null;
   portal: Portal = new Portal(this);
@@ -183,6 +184,7 @@ class App extends React.Component<any, AppState> {
   broadcastedElementVersions: Map<string, number> = new Map();
   removeSceneCallback: SceneStateCallbackRemover | null = null;
   unmounted: boolean = false;
+  postMessageListener: PostMessageListener = addPostMessageSupport(this);
   actionManager: ActionManager;
 
   public state: AppState = {
@@ -201,6 +203,10 @@ class App extends React.Component<any, AppState> {
 
     this.actionManager.registerAction(createUndoAction(history));
     this.actionManager.registerAction(createRedoAction(history));
+  }
+
+  public getHistory() {
+    return history;
   }
 
   public render() {
@@ -259,7 +265,7 @@ class App extends React.Component<any, AppState> {
     );
   }
 
-  private syncActionResult = withBatchedUpdates((res: ActionResult) => {
+  public syncActionResult = withBatchedUpdates((res: ActionResult) => {
     if (this.unmounted) {
       return;
     }
@@ -366,6 +372,7 @@ class App extends React.Component<any, AppState> {
   };
 
   public async componentDidMount() {
+    this.postMessageListener.start();
     if (
       process.env.NODE_ENV === ENV.TEST ||
       process.env.NODE_ENV === ENV.DEVELOPMENT
@@ -446,6 +453,7 @@ class App extends React.Component<any, AppState> {
       false,
     );
     window.removeEventListener(EVENT.BEFORE_UNLOAD, this.beforeUnload);
+    this.postMessageListener.dispose();
   }
 
   private addEventListeners() {
@@ -502,7 +510,7 @@ class App extends React.Component<any, AppState> {
     this.broadcastScene(SCENE.UPDATE, /* syncAll */ true);
   }, SYNC_FULL_SCENE_INTERVAL_MS);
 
-  componentDidUpdate() {
+  componentDidUpdate(prevProps: AppProps, prevState: AppState) {
     if (this.state.isCollaborating && !this.portal.socket) {
       this.initializeSocketClient({ showLoadingState: true });
     }
@@ -598,6 +606,12 @@ class App extends React.Component<any, AppState> {
     }
 
     history.record(this.state, globalSceneState.getElementsIncludingDeleted());
+    this.postMessageListener.didUpdate(
+      prevProps,
+      prevState,
+      this.props,
+      this.state,
+    );
   }
 
   // Copy/paste
@@ -1159,6 +1173,10 @@ class App extends React.Component<any, AppState> {
   private onKeyDown = withBatchedUpdates((event: KeyboardEvent) => {
     // ensures we don't prevent devTools select-element feature
     if (event[KEYS.CTRL_OR_CMD] && event.shiftKey && event.key === "C") {
+      return;
+    }
+
+    if (this.postMessageListener.handleKeyDown(event)) {
       return;
     }
 

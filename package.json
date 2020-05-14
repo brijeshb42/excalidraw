@@ -82,7 +82,7 @@
     "fix:code": "npm run test:code -- --fix",
     "fix:other": "npm run prettier -- --write",
     "prettier": "prettier \"**/*.{css,scss,json,md,html,yml}\" --ignore-path=.eslintignore",
-    "start": "react-scripts start",
+    "start": "BROWSER=none PORT=8080 react-scripts start",
     "test": "npm run test:app",
     "test:all": "npm run test:typecheck && npm run test:code && npm run test:other && npm run test:app -- --watchAll=false",
     "test:update": "npm run test:app -- --updateSnapshot --watchAll=false",

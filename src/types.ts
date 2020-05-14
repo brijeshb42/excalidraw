@@ -80,6 +80,9 @@ export type AppState = {
     (e.g. when you double-click on a group's element) */
   editingGroupId: GroupId | null;
 };
+export interface AppProps {
+  isEmbed?: boolean;
+}
 
 export type PointerCoords = Readonly<{
   x: number;
